@@ -3,7 +3,7 @@
 
 **LLMRipper** allows you to fine-tune any Hugging Face LLM model without writing any code, using the Transformers architecture.
 
-With LLMRipper.py v1.0, you can perform fine-tuning on either a private or public LLM model and dataset using a single GPU. In the next version, support for multi-GPU training will also be added to the tool’s features.
+With LLMRipper.py v1.0, you can perform fine-tuning on either a private or public LLM model and dataset using a single GPU. In the next version, support for multi-GPU training will also be added to the tool’s features. Your training dataset must be in the System-User-Assistant structure.
 
 ## Features
 
