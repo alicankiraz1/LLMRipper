@@ -26,7 +26,7 @@ With LLMRipper.py v1.0, you can perform fine-tuning on either a private or publi
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/YourUsername/LLMRipper.git
+   git clone https://github.com/alicankiraz1/LLMRipper.git
    cd LLMRipper
 
 2. **Install Python Libraries:**
