@@ -78,7 +78,7 @@ def main():
             else:
                 hf_token = get_input("Please enter your Hugging Face token: ")
                 login(token=hf_token)
-        dataset_repo = get_input("Enter the Hugging Face repository name for the dataset (e.g., AlicanKiraz0/05-01-CyberSec-Cencored): ")
+        dataset_repo = get_input("Enter the Hugging Face repository name for the dataset (e.g., AlicanKiraz0/Test-CyberSec-dataset): ")
         if hf_dataset_privacy == "private" and hf_token is not None:
             raw_datasets = load_dataset(dataset_repo, token=hf_token)
         else:
