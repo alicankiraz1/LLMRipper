@@ -1,5 +1,5 @@
 # LLMRipper
-![LLMRipper](LLMRipper_Icon.png)
+![LLMRipper](/images/LLMRipper_Icon.png)
 
 **LLMRipper** allows you to fine-tune any Hugging Face LLM model without writing any code, using the Transformers architecture.
 
@@ -18,7 +18,7 @@ With LLMRipper.py v1.0, you can perform fine-tuning on either a private or publi
 
 ## Demo
 
-![LLMRipper Demo](demo.png)
+![LLMRipper Demo](/images/demo.png)
 
 
 ## Installation
@@ -32,7 +32,7 @@ With LLMRipper.py v1.0, you can perform fine-tuning on either a private or publi
 2. **Install Python Libraries:**
 
    ```bash
-   pip install transformers datasets peft bitsandbytes
+   pip install -r requirements.txt
 
 
 3. **Run the Code:**

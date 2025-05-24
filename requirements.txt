@@ -1,0 +1,7 @@
+torch
+datasets
+transformers
+peft
+huggingface_hub
+pyfiglet
+bitsandbytes
