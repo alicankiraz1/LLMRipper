@@ -400,7 +400,7 @@ def main():
         bf16=(precision_choice == "bf16" if precision_choice else False),
         gradient_checkpointing=True,
         max_grad_norm=0.5,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         save_strategy="steps",
         save_total_limit=2,
         load_best_model_at_end=True,
