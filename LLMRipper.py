@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LLMRipper v2 – Interactive LLM Fine‑Tuner
+LLMRipper v2 – Interactive LLM Fine‑Tuner
 ----------------------------------------
-New in this release (2025‑06‑07)
-✓ Asks whether the user wants **LoRA‑based** (parameter‑efficient) or **Full** fine‑tuning *before* any other training hyper‑parameters are chosen. The rest of the workflow adapts automatically.
-✓ Warns that datasets **must** follow the *System/User/Assistant* schema and verifies these columns exist.
-✓ Prompts for dataset file‑format – **csv, json, jsonl, parquet** – and loads the file with the correct HuggingFace dataset loader.
-✓ Improved validation & helpful error messages.
-✓ Conditional questions (e.g. LoRA weight merge) only appear when relevant.
+New in this release (2025‑06‑07)
+✓ Asks whether the user wants **LoRA‑based** (parameter‑efficient) or **Full** fine‑tuning *before* any other training hyper‑parameters are chosen. The rest of the workflow adapts automatically.
+✓ Warns that datasets **must** follow the *System/User/Assistant* schema and verifies these columns exist.
+✓ Prompts for dataset file‑format – **csv, json, jsonl, parquet** – and loads the file with the correct HuggingFace dataset loader.
+✓ Improved validation & helpful error messages.
+✓ Conditional questions (e.g. LoRA weight merge) only appear when relevant.
 """
 
 import os
 import sys
 import subprocess
+import getpass
 import torch
 from datasets import load_dataset, DatasetDict
 from transformers import (
@@ -48,7 +49,7 @@ def print_banner():
         import pyfiglet
     ascii_banner = pyfiglet.figlet_format("LLMRipper")
     print(ascii_banner)
-    print("Created by Alican Kiraz – v2.0")
+    print("Created by Alican Kiraz – v2.0")
 
 
 def get_input(prompt: str, valid_options=None):
@@ -67,6 +68,16 @@ def get_input(prompt: str, valid_options=None):
                 print("Input cannot be empty. Please try again.")
 
 
+def get_secure_input(prompt: str):
+    """Secure input for tokens and passwords (hidden from terminal)."""
+    while True:
+        response = getpass.getpass(prompt).strip()
+        if response:
+            return response
+        else:
+            print("Input cannot be empty. Please try again.")
+
+
 # ---------------------------------------------------------------------------
 # Dataset helpers
 # ---------------------------------------------------------------------------
@@ -78,8 +89,20 @@ def load_local_dataset(path: str, file_fmt: str):
     """Load a local dataset file with the correct HF loader."""
     if file_fmt not in SUPPORTED_FORMATS:
         raise ValueError(f"Unsupported format: {file_fmt} – choose one of {', '.join(SUPPORTED_FORMATS)}")
-    loader_name = "json" if file_fmt in {"json", "jsonl"} else file_fmt
-    return load_dataset(loader_name, data_files={"train": path})
+    
+    # Check if file exists
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Dataset file not found: {path}")
+    
+    try:
+        if file_fmt == "jsonl":
+            return load_dataset("json", data_files={"train": path}, split=None)
+        elif file_fmt == "json":
+            return load_dataset("json", data_files={"train": path})
+        else:
+            return load_dataset(file_fmt, data_files={"train": path})
+    except Exception as e:
+        raise ValueError(f"Failed to load dataset from {path}: {str(e)}")
 
 
 def ensure_columns(dataset):
@@ -100,7 +123,7 @@ def main():
     model_privacy = get_input("Is your *base model* private or public? [private/public]: ", ["private", "public"])
     hf_token = None
     if model_privacy == "private":
-        hf_token = get_input("Enter your Hugging Face token: ")
+        hf_token = get_secure_input("Enter your Hugging Face token: ")
         login(token=hf_token)
 
     base_model_name = get_input("Enter the Hugging Face repo for the base model (e.g. AlicanKiraz0/LLM‑Base): ")
@@ -118,29 +141,57 @@ def main():
 
     if dataset_source == "local":
         dataset_path = get_input("Enter the path to your local dataset file: ")
-        raw_datasets = load_local_dataset(dataset_path, dataset_format)
+        try:
+            raw_datasets = load_local_dataset(dataset_path, dataset_format)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error loading dataset: {e}")
+            sys.exit(1)
     else:
         hub_privacy = get_input("Is the HF dataset repo public or private? [public/private]: ", ["public", "private"])
         if hub_privacy == "private":
             if not hf_token:
-                hf_token = get_input("Enter your Hugging Face token for the *dataset*: ")
+                hf_token = get_secure_input("Enter your Hugging Face token for the *dataset*: ")
                 login(token=hf_token)
         dataset_repo = get_input("Enter the HF dataset repo (e.g. AlicanKiraz0/my‑chat‑dataset): ")
         load_args = {"token": hf_token} if (hub_privacy == "private" and hf_token) else {}
-        raw_datasets = load_dataset(dataset_repo, **load_args)
+        try:
+            raw_datasets = load_dataset(dataset_repo, **load_args)
+        except Exception as e:
+            print(f"Error loading dataset from HuggingFace Hub: {e}")
+            sys.exit(1)
 
     # Ensure train/validation splits exist
     if len(raw_datasets) == 1 and "train" in raw_datasets:
         split_ds = raw_datasets["train"].train_test_split(test_size=0.1, shuffle=True, seed=42)
         raw_datasets = DatasetDict({"train": split_ds["train"], "validation": split_ds["test"]})
 
-    ensure_columns(raw_datasets)
+    try:
+        ensure_columns(raw_datasets)
+    except ValueError as e:
+        print(f"Dataset validation error: {e}")
+        print("Please ensure your dataset contains the required columns: System, User, Assistant")
+        sys.exit(1)
 
     # Hyper‑parameters --------------------------------------------------------
-    max_length = int(get_input("Enter maximum sequence length (e.g. 1024 or 2048): "))
-    grad_acc_steps = int(get_input("Gradient accumulation steps (1/2/4/8): "))
-    per_device_bs = int(get_input("Per‑device train batch size (1/2/4/8): "))
-    num_epochs = int(get_input("Number of epochs: "))
+    try:
+        max_length = int(get_input("Enter maximum sequence length (e.g. 1024 or 2048): "))
+        if max_length < 128 or max_length > 8192:
+            print("Warning: Sequence length should typically be between 128 and 8192")
+        
+        grad_acc_steps = int(get_input("Gradient accumulation steps (1/2/4/8): "))
+        if grad_acc_steps not in [1, 2, 4, 8]:
+            print("Warning: Gradient accumulation steps should typically be 1, 2, 4, or 8")
+        
+        per_device_bs = int(get_input("Per‑device train batch size (1/2/4/8): "))
+        if per_device_bs not in [1, 2, 4, 8]:
+            print("Warning: Batch size should typically be 1, 2, 4, or 8")
+        
+        num_epochs = int(get_input("Number of epochs: "))
+        if num_epochs < 1 or num_epochs > 100:
+            print("Warning: Number of epochs should typically be between 1 and 100")
+    except ValueError as e:
+        print(f"Invalid input for hyperparameters: {e}")
+        sys.exit(1)
 
     # Quantisation choice -----------------------------------------------------
     quantize_choice = get_input("Use model quantisation? [yes/no]: ", ["yes", "no"])
