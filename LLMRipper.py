@@ -1,11 +1,20 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+LLMRipper v2 – Interactive LLM Fine‑Tuner
+----------------------------------------
+New in this release (2025‑06‑07)
+✓ Asks whether the user wants **LoRA‑based** (parameter‑efficient) or **Full** fine‑tuning *before* any other training hyper‑parameters are chosen. The rest of the workflow adapts automatically.
+✓ Warns that datasets **must** follow the *System/User/Assistant* schema and verifies these columns exist.
+✓ Prompts for dataset file‑format – **csv, json, jsonl, parquet** – and loads the file with the correct HuggingFace dataset loader.
+✓ Improved validation & helpful error messages.
+✓ Conditional questions (e.g. LoRA weight merge) only appear when relevant.
+"""
+
 import os
 import sys
 import subprocess
 import torch
-import logging
-from pathlib import Path
-from typing import Optional, Dict, Any, Union
-from tqdm import tqdm
 from datasets import load_dataset, DatasetDict
 from transformers import (
     AutoTokenizer,
@@ -18,272 +27,288 @@ from transformers import (
 from peft import (
     LoraConfig,
     get_peft_model,
-    prepare_model_for_kbit_training
+    prepare_model_for_kbit_training,
 )
-from transformers import BitsAndBytesConfig
 try:
     from peft import prepare_model_for_int8_training
 except ImportError:
     prepare_model_for_int8_training = None
-    print("Warning: prepare_model_for_int8_training not found. Please update peft if you want to use 8-bit quantization.")
+    print("Warning: prepare_model_for_int8_training not found. Update peft if you need 8‑bit training support.")
 from huggingface_hub import login
 
-# Loglama yapılandırması
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('llmripper.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-class LLMRipper:
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or {}
-        self.model = None
-        self.tokenizer = None
-        self.trainer = None
-        self.raw_datasets = None
-        self._setup_environment()
-    
-    def _setup_environment(self):
-        """Ortam değişkenlerini ve CUDA ayarlarını yapılandırır."""
-        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-        if torch.cuda.is_available():
-            logger.info(f"CUDA kullanılabilir. GPU sayısı: {torch.cuda.device_count()}")
-            for i in range(torch.cuda.device_count()):
-                logger.info(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+def print_banner():
+    """Pretty ASCII banner (installs *pyfiglet* the first time)."""
+    try:
+        import pyfiglet
+    except ImportError:
+        print("pyfiglet not found. Installing pyfiglet…")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyfiglet"])
+        import pyfiglet
+    ascii_banner = pyfiglet.figlet_format("LLMRipper")
+    print(ascii_banner)
+    print("Created by Alican Kiraz – v2.0")
+
+
+def get_input(prompt: str, valid_options=None):
+    """Small helper that forces the user to pick a valid option (case‑insensitive)."""
+    while True:
+        response = input(prompt).strip()
+        if valid_options:
+            if response.lower() in valid_options:
+                return response.lower()
+            else:
+                print(f"Invalid input. Please choose from: {', '.join(valid_options)}")
         else:
-            logger.warning("CUDA kullanılamıyor. CPU kullanılacak.")
-
-    @staticmethod
-    def print_banner():
-        """ASCII banner'ı yazdırır."""
-        try:
-            import pyfiglet
-        except ImportError:
-            logger.info("pyfiglet yükleniyor...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "pyfiglet"])
-            import pyfiglet
-        ascii_banner = pyfiglet.figlet_format("LLMRipper")
-        print(ascii_banner)
-        print("Created by Alican Kiraz")
-
-    @staticmethod
-    def get_input(prompt: str, valid_options: Optional[list] = None) -> str:
-        """Kullanıcıdan giriş alır ve doğrular."""
-        while True:
-            response = input(prompt).strip()
-            if valid_options:
-                if response.lower() in valid_options:
-                    return response.lower()
-                else:
-                    print(f"Geçersiz giriş. Lütfen şunlardan birini seçin: {', '.join(valid_options)}")
+            if response:
+                return response
             else:
-                if response:
-                    return response
-                else:
-                    print("Giriş boş olamaz. Lütfen tekrar deneyin.")
+                print("Input cannot be empty. Please try again.")
 
-    def load_model(self, base_model_name: str, hf_token: Optional[str] = None):
-        """Modeli yükler ve yapılandırır."""
-        try:
-            logger.info(f"Model yükleniyor: {base_model_name}")
-            finetune_type = self.config.get("finetune_type", "lora")  # "lora" veya "full"
-            if self.config.get("quantize", False):
-                bit_choice = self.config.get("quantization_bits", 4)
-                quant_config = None
-                if bit_choice == 4:
-                    quant_config = BitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_use_double_quant=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.float16,
-                    )
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        base_model_name,
-                        token=hf_token,
-                        device_map="auto",
-                        trust_remote_code=True,
-                        quantization_config=quant_config
-                    )
-                    if finetune_type == "lora":
-                        self.model = prepare_model_for_kbit_training(self.model)
-                else:
-                    quant_config = BitsAndBytesConfig(
-                        load_in_8bit=True
-                    )
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        base_model_name,
-                        token=hf_token,
-                        device_map="auto",
-                        trust_remote_code=True,
-                        quantization_config=quant_config
-                    )
-                    if finetune_type == "lora":
-                        if prepare_model_for_int8_training is None:
-                            raise ImportError("prepare_model_for_int8_training bulunamadı. Lütfen peft'i güncelleyin.")
-                        self.model = prepare_model_for_int8_training(self.model)
+
+# ---------------------------------------------------------------------------
+# Dataset helpers
+# ---------------------------------------------------------------------------
+SUPPORTED_FORMATS = ["csv", "json", "jsonl", "parquet"]
+REQ_COLUMNS = {"System", "User", "Assistant"}
+
+
+def load_local_dataset(path: str, file_fmt: str):
+    """Load a local dataset file with the correct HF loader."""
+    if file_fmt not in SUPPORTED_FORMATS:
+        raise ValueError(f"Unsupported format: {file_fmt} – choose one of {', '.join(SUPPORTED_FORMATS)}")
+    loader_name = "json" if file_fmt in {"json", "jsonl"} else file_fmt
+    return load_dataset(loader_name, data_files={"train": path})
+
+
+def ensure_columns(dataset):
+    """Verify that required columns exist in *all* splits."""
+    missing = REQ_COLUMNS - set(dataset["train"].column_names)
+    if missing:
+        raise ValueError(f"Dataset must contain columns {', '.join(REQ_COLUMNS)}. Missing: {', '.join(missing)}")
+
+
+# ---------------------------------------------------------------------------
+# Main interactive script
+# ---------------------------------------------------------------------------
+
+def main():
+    print_banner()
+
+    # Privacy & authentication ------------------------------------------------
+    model_privacy = get_input("Is your *base model* private or public? [private/public]: ", ["private", "public"])
+    hf_token = None
+    if model_privacy == "private":
+        hf_token = get_input("Enter your Hugging Face token: ")
+        login(token=hf_token)
+
+    base_model_name = get_input("Enter the Hugging Face repo for the base model (e.g. AlicanKiraz0/LLM‑Base): ")
+
+    # NEW ▶ Finetuning strategy ------------------------------------------------
+    tuning_type = get_input("Select tuning strategy – LoRA (parameter‑efficient) or Full? [lora/full]: ", ["lora", "full"])
+    is_lora = (tuning_type == "lora")
+
+    # Dataset location & format ----------------------------------------------
+    print("\n***  Dataset Requirements  ***")
+    print("Your file MUST contain the columns: System | User | Assistant\n")
+
+    dataset_source = get_input("Is the dataset local or on HuggingFace Hub? [local/huggingface]: ", ["local", "huggingface"])
+    dataset_format = get_input("Which file format are you using? [csv/json/jsonl/parquet]: ", SUPPORTED_FORMATS)
+
+    if dataset_source == "local":
+        dataset_path = get_input("Enter the path to your local dataset file: ")
+        raw_datasets = load_local_dataset(dataset_path, dataset_format)
+    else:
+        hub_privacy = get_input("Is the HF dataset repo public or private? [public/private]: ", ["public", "private"])
+        if hub_privacy == "private":
+            if not hf_token:
+                hf_token = get_input("Enter your Hugging Face token for the *dataset*: ")
+                login(token=hf_token)
+        dataset_repo = get_input("Enter the HF dataset repo (e.g. AlicanKiraz0/my‑chat‑dataset): ")
+        load_args = {"token": hf_token} if (hub_privacy == "private" and hf_token) else {}
+        raw_datasets = load_dataset(dataset_repo, **load_args)
+
+    # Ensure train/validation splits exist
+    if len(raw_datasets) == 1 and "train" in raw_datasets:
+        split_ds = raw_datasets["train"].train_test_split(test_size=0.1, shuffle=True, seed=42)
+        raw_datasets = DatasetDict({"train": split_ds["train"], "validation": split_ds["test"]})
+
+    ensure_columns(raw_datasets)
+
+    # Hyper‑parameters --------------------------------------------------------
+    max_length = int(get_input("Enter maximum sequence length (e.g. 1024 or 2048): "))
+    grad_acc_steps = int(get_input("Gradient accumulation steps (1/2/4/8): "))
+    per_device_bs = int(get_input("Per‑device train batch size (1/2/4/8): "))
+    num_epochs = int(get_input("Number of epochs: "))
+
+    # Quantisation choice -----------------------------------------------------
+    quantize_choice = get_input("Use model quantisation? [yes/no]: ", ["yes", "no"])
+
+    # NOTE: full fine‑tuning + 4‑/8‑bit weights is *experimental*; fall back to fp16/bf16/fp32.
+    if tuning_type == "full" and quantize_choice == "yes":
+        print("Full fine‑tuning with 4‑/8‑bit adapters is not officially supported – switching to non‑quantised training.")
+        quantize_choice = "no"
+
+    # Precision (only asked when not quantising) -----------------------------
+    precision_choice = None
+    torch_dtype = None
+    if quantize_choice == "no":
+        precision_choice = get_input("Choose precision [fp16/bf16/fp32]: ", ["fp16", "bf16", "fp32"])
+        torch_dtype = {
+            "fp16": torch.float16,
+            "bf16": torch.bfloat16,
+            "fp32": torch.float32,
+        }[precision_choice]
+
+    # -----------------------------------------------------------------------
+    # MODEL LOADING SECTION
+    # -----------------------------------------------------------------------
+    print("Loading model – this can take a while…")
+
+    common_kwargs = dict(
+        token=hf_token if model_privacy == "private" else None,
+        trust_remote_code=True,
+        device_map="auto",
+    )
+
+    if quantize_choice == "yes":  # 4‑bit / 8‑bit LoRA fine‑tuning
+        bit_choice = get_input("Quantisation bits – 4 or 8? [4/8]: ", ["4", "8"])
+        load_kwargs = {
+            "load_in_4bit": bit_choice == "4",
+            "load_in_8bit": bit_choice == "8",
+        }
+        model = AutoModelForCausalLM.from_pretrained(base_model_name, **common_kwargs, **load_kwargs)
+        if bit_choice == "4":
+            model = prepare_model_for_kbit_training(model)
+        else:  # 8‑bit
+            if prepare_model_for_int8_training is None:
+                raise ImportError("prepare_model_for_int8_training missing – update *peft* package.")
+            model = prepare_model_for_int8_training(model)
+    else:  # No quantisation
+        model = AutoModelForCausalLM.from_pretrained(base_model_name, **common_kwargs, torch_dtype=torch_dtype)
+        model.config.use_cache = False
+
+    # Wrap with LoRA if requested -------------------------------------------
+    if is_lora:
+        lora_cfg = LoraConfig(r=4, lora_alpha=16, lora_dropout=0.1, bias="none", task_type="CAUSAL_LM")
+        model = get_peft_model(model, lora_cfg)
+        model.enable_input_require_grads()
+
+    # -----------------------------------------------------------------------
+    # TOKENISER & PRE‑PROCESSING
+    # -----------------------------------------------------------------------
+    tokenizer = AutoTokenizer.from_pretrained(base_model_name, **common_kwargs, use_fast=False)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    def create_prompt(sys_text: str, usr_text: str):
+        return f"[SYSTEM]\n{sys_text}\n[USER]\n{usr_text}\n[ASSISTANT]\n"
+
+    def chunk(seq, size):
+        return [seq[i:i + size] for i in range(0, len(seq), size)]
+
+    def preprocess_function(examples):
+        final_input_ids, final_attention_masks, final_labels = [], [], []
+        for sys_t, usr_t, as_t in zip(examples["System"], examples["User"], examples["Assistant"]):
+            prompt = create_prompt(sys_t or "", usr_t or "")
+            full_text = prompt + (as_t or "")
+            tokenised = tokenizer(full_text, truncation=False, padding=False)
+            ids = tokenised["input_ids"]
+            prompt_len = len(tokenizer(prompt, truncation=False, padding=False)["input_ids"])
+            labels = [-100] * len(ids)
+            for i in range(prompt_len, len(ids)):
+                labels[i] = ids[i]
+            # Split or pad to max_length
+            if len(ids) > max_length:
+                id_chunks = chunk(ids, max_length)
+                label_chunks = chunk(labels, max_length)
+                for ic, lc in zip(id_chunks, label_chunks):
+                    pad_len = max_length - len(ic)
+                    ic += [tokenizer.pad_token_id] * pad_len
+                    lc += [-100] * pad_len
+                    attn = [int(tok != tokenizer.pad_token_id) for tok in ic]
+                    final_input_ids.append(ic)
+                    final_attention_masks.append(attn)
+                    final_labels.append(lc)
             else:
-                precision = self.config.get("precision", "fp16")
-                torch_dtype = {
-                    "fp16": torch.float16,
-                    "bf16": torch.bfloat16,
-                    "fp32": torch.float32
-                }[precision]
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    base_model_name,
-                    token=hf_token,
-                    torch_dtype=torch_dtype,
-                    device_map="auto",
-                    trust_remote_code=True
-                )
-                self.model.config.use_cache = False
+                pad_len = max_length - len(ids)
+                ids += [tokenizer.pad_token_id] * pad_len
+                labels += [-100] * pad_len
+                attn = [int(tok != tokenizer.pad_token_id) for tok in ids]
+                final_input_ids.append(ids)
+                final_attention_masks.append(attn)
+                final_labels.append(labels)
+        return {"input_ids": final_input_ids, "attention_mask": final_attention_masks, "labels": final_labels}
 
-            if finetune_type == "lora":
-                lora_config = LoraConfig(
-                    r=self.config.get("lora_r", 4),
-                    lora_alpha=self.config.get("lora_alpha", 16),
-                    lora_dropout=self.config.get("lora_dropout", 0.1),
-                    bias="none",
-                    task_type="CAUSAL_LM"
-                )
-                self.model = get_peft_model(self.model, lora_config)
-                self.model.enable_input_require_grads()
-                logger.info("LoRA ile ince ayar için model hazırlandı.")
-            else:
-                logger.info("Full fine-tune için model hazırlandı (LoRA eklenmedi).")
+    print("Tokenising dataset…")
+    tokenised_train = raw_datasets["train"].map(preprocess_function, batched=True, remove_columns=raw_datasets["train"].column_names)
+    tokenised_val = raw_datasets["validation"].map(preprocess_function, batched=True, remove_columns=raw_datasets["validation"].column_names)
 
-        except Exception as e:
-            logger.error(f"Model yüklenirken hata oluştu: {str(e)}")
-            raise
+    data_collator = DefaultDataCollator()
 
-    def load_tokenizer(self, base_model_name: str, hf_token: Optional[str] = None):
-        """Tokenizer'ı yükler ve yapılandırır."""
-        try:
-            logger.info("Tokenizer yükleniyor...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                base_model_name,
-                token=hf_token,
-                use_fast=False,
-                trust_remote_code=True
-            )
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-            logger.info("Tokenizer başarıyla yüklendi.")
-        except Exception as e:
-            logger.error(f"Tokenizer yüklenirken hata oluştu: {str(e)}")
-            raise
+    # -----------------------------------------------------------------------
+    # TRAINING
+    # -----------------------------------------------------------------------
+    print("\n***  Training  ***")
+    training_args = TrainingArguments(
+        output_dir="./finetuned_model",
+        overwrite_output_dir=True,
+        num_train_epochs=num_epochs,
+        per_device_train_batch_size=per_device_bs,
+        gradient_accumulation_steps=grad_acc_steps,
+        eval_steps=200,
+        save_steps=200,
+        logging_steps=100,
+        learning_rate=2e-5,
+        warmup_steps=100,
+        weight_decay=0.01,
+        fp16=(precision_choice == "fp16" if precision_choice else False),
+        bf16=(precision_choice == "bf16" if precision_choice else False),
+        gradient_checkpointing=True,
+        max_grad_norm=0.5,
+        evaluation_strategy="steps",
+        save_strategy="steps",
+        save_total_limit=2,
+        load_best_model_at_end=True,
+        push_to_hub=False,
+        optim="adamw_torch_fused",
+    )
 
-    def load_dataset(self, dataset_config: Dict[str, Any]):
-        """Veri setini yükler ve hazırlar."""
-        try:
-            logging.info("Veri seti yükleniyor...")
-            ds = load_dataset(
-                dataset_config["name"],
-                data_files=dataset_config["data_files"],
-                split=dataset_config.get("split", "train")
-            )
-            # Eğer dönen veri Dataset ise, DatasetDict'e sar
-            from datasets import Dataset, DatasetDict
-            if isinstance(ds, Dataset):
-                self.raw_datasets = DatasetDict({"train": ds})
-            else:
-                self.raw_datasets = ds
-            logging.info("Veri seti başarıyla yüklendi!")
-        except Exception as e:
-            logging.error(f"Veri seti yüklenirken hata oluştu: {str(e)}")
-            raise
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenised_train,
+        eval_dataset=tokenised_val,
+        data_collator=data_collator,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+    )
+    trainer.train()
 
-    def preprocess_data(self):
-        """Veri setini işler ve tokenleştirir."""
-        try:
-            if not self.tokenizer:
-                raise ValueError("Tokenizer yüklenmemiş!")
-            if not self.raw_datasets or "train" not in self.raw_datasets:
-                raise ValueError("Veri seti yüklenmemiş veya 'train' split'i yok!")
-            def tokenize_function(example):
-                return self.tokenizer(
-                    f"{example['System']}\nUser: {example['User']}\nAssistant: {example['Assistant']}",
-                    truncation=True,
-                    max_length=self.config["max_length"],
-                    padding="max_length"
-                )
-            self.tokenized_train_dataset = self.raw_datasets["train"].map(tokenize_function, batched=False)
-            # Eğer validation split varsa
-            if "validation" in self.raw_datasets:
-                self.tokenized_dev_dataset = self.raw_datasets["validation"].map(tokenize_function, batched=False)
-            else:
-                self.tokenized_dev_dataset = None
-            logging.info("Veri seti başarıyla tokenleştirildi!")
-        except Exception as e:
-            logging.error(f"Veri ön işlenirken hata oluştu: {str(e)}")
-            raise
+    # Save outputs -----------------------------------------------------------
+    trainer.save_model("./finetuned_model")
+    tokenizer.save_pretrained("./finetuned_model")
+    print("Training finished → ./finetuned_model created.")
 
-    def train(self):
-        """Modeli eğitir."""
-        try:
-            logger.info("Eğitim başlıyor...")
-            training_args = TrainingArguments(
-                output_dir="./finetuned_model",
-                overwrite_output_dir=True,
-                num_train_epochs=self.config.get("num_epochs", 3),
-                per_device_train_batch_size=self.config.get("batch_size", 4),
-                gradient_accumulation_steps=self.config.get("gradient_accumulation_steps", 4),
-                eval_steps=200,
-                save_steps=200,
-                logging_steps=100,
-                learning_rate=self.config.get("learning_rate", 2e-5),
-                warmup_steps=100,
-                weight_decay=0.01,
-                fp16=self.config.get("precision") == "fp16",
-                bf16=self.config.get("precision") == "bf16",
-                gradient_checkpointing=True,
-                max_grad_norm=0.5,
-                eval_strategy="steps",
-                save_strategy="steps",
-                save_total_limit=2,
-                load_best_model_at_end=True,
-                push_to_hub=False,
-                optim="adamw_torch_fused"
-            )
+    # Merge LoRA weights (only if LoRA strategy) -----------------------------
+    if is_lora:
+        merge_choice = get_input("Merge LoRA weights with the base model? [yes/no]: ", ["yes", "no"])
+        if merge_choice == "yes":
+            merged_dir = "./merged_final_model"
+            print("Merging…")
+            merged_model = model.merge_and_unload()
+            merged_model.save_pretrained(merged_dir)
+            tokenizer.save_pretrained(merged_dir)
+            print(f"Merged model saved → {merged_dir}")
+            if get_input("Push merged model to HuggingFace Hub? [yes/no]: ", ["yes", "no"]) == "yes":
+                repo_id = get_input("HF repo ID to push to (e.g. AlicanKiraz0/LLMRipper‑finetuned): ")
+                print("Uploading…")
+                merged_model.push_to_hub(repo_id, token=hf_token)
+                tokenizer.push_to_hub(repo_id, token=hf_token)
+                print("Upload complete.")
 
-            self.trainer = Trainer(
-                model=self.model,
-                args=training_args,
-                train_dataset=self.tokenized_train_dataset,
-                eval_dataset=self.tokenized_dev_dataset,
-                data_collator=DefaultDataCollator(),
-                callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
-            )
+    print("All done – happy prompting! ✨")
 
-            self.trainer.train()
-            self.trainer.save_model("./finetuned_model")
-            self.tokenizer.save_pretrained("./finetuned_model")
-            logger.info("Eğitim tamamlandı -> './finetuned_model' klasörü oluşturuldu.")
-        except Exception as e:
-            logger.error(f"Eğitim sırasında hata oluştu: {str(e)}")
-            raise
 
-    def merge_and_save(self, output_dir: str):
-        """Modeli birleştirir ve kaydeder."""
-        try:
-            if not self.model:
-                raise ValueError("Model yüklenmemiş!")
-            if not self.tokenizer:
-                raise ValueError("Tokenizer yüklenmemiş!")
-            output_path = Path(output_dir)
-            output_path.mkdir(parents=True, exist_ok=True)
-            if self.config["finetune_type"] == "lora":
-                logging.info("LoRA ağırlıkları birleştiriliyor...")
-                self.model = self.model.merge_and_unload()
-            logging.info(f"Model {output_dir} dizinine kaydediliyor...")
-            self.model.save_pretrained(output_dir)
-            # Tokenizer'ın tüm dosyalarını kaydet
-            self.tokenizer.save_pretrained(output_dir)
-            logging.info("Model başarıyla kaydedildi!")
-        except Exception as e:
-            logging.error(f"Model kaydedilirken hata oluştu: {str(e)}")
-            raise
+if __name__ == "__main__":
+    main()
