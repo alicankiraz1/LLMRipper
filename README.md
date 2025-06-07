@@ -1,4 +1,4 @@
-# LLMRipper
+# LLMRipper v2 - Interactive LLM Fine-Tuner
 
 <div align="center">
   <img src="LLMRipper_Icon.png" alt="LLMRipper Logo" width="600"/>
@@ -6,126 +6,174 @@
   <p><em>Fine-tune and merge LLMs with ease</em></p>
 </div>
 
-## 🚀 Overview
+**LLMRipper** is an interactive tool for fine-tuning Large Language Models (LLMs) with both LoRA (Parameter-Efficient Fine-Tuning) and Full Fine-Tuning support.
 
-LLMRipper is a powerful Python tool designed to simplify the process of fine-tuning and merging Large Language Models (LLMs). It provides a streamlined interface for loading models, processing datasets, and creating merged models with enhanced capabilities.
+## Features
 
-## ✨ Features
+✅ **LoRA & Full Fine-Tuning Support**: Choose between parameter-efficient LoRA or full model fine-tuning  
+✅ **Multiple Dataset Formats**: Supports CSV, JSON, JSONL, and Parquet formats  
+✅ **Dataset Validation**: Automatic validation for required System/User/Assistant columns  
+✅ **Quantization Support**: 4-bit and 8-bit quantization for memory efficiency  
+✅ **Interactive Workflow**: Step-by-step guided process  
+✅ **HuggingFace Integration**: Seamless integration with HF Hub for models and datasets  
+✅ **Error Handling**: Comprehensive error handling and validation  
+✅ **Secure Token Input**: Hidden token input for better security  
 
-- **Easy Model Loading**: Load models from Hugging Face Hub with a single line of code
-- **Dataset Processing**: Efficient handling of training datasets
-- **Model Merging**: Seamless merging of multiple models
-- **Customizable Training**: Flexible training parameters
-- **Progress Tracking**: Real-time progress monitoring
-- **Error Handling**: Robust error management and logging
+## Installation
 
-## 📋 Requirements
+### Requirements
 
 - Python 3.8+
-- PyTorch
-- Transformers
-- Datasets
-- Other dependencies listed in `requirements.txt`
+- CUDA-compatible GPU (recommended)
+- 8GB+ RAM (16GB+ recommended)
 
-## 🛠️ Installation
+### Install Dependencies
 
-1. Clone the repository:
-```bash
-git clone https://github.com/alicankiraz1/LLMRipper.git
-cd LLMRipper
-```
-
-2. Create a virtual environment:
-```bash
-python -m venv env
-source env/bin/activate  # On Windows: env\Scripts\activate
-```
-
-3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## 💻 Usage
-
-### Basic Usage
-
-```python
-from llmripper import LLMRipper
-
-# Initialize LLMRipper
-ripper = LLMRipper(
-    model_name="gpt2",
-    dataset_name="wikitext",
-    output_dir="./output"
-)
-
-# Load and process data
-ripper.load_dataset()
-ripper.preprocess_data()
-
-# Load model and tokenizer
-ripper.load_model()
-ripper.load_tokenizer()
-
-# Merge and save models
-ripper.merge_and_save()
-```
-
-### Advanced Usage
-
-```python
-# Custom training configuration
-ripper = LLMRipper(
-    model_name="gpt2",
-    dataset_name="wikitext",
-    output_dir="./output",
-    batch_size=8,
-    learning_rate=2e-5,
-    num_epochs=3
-)
-
-# Custom preprocessing
-ripper.preprocess_data(
-    max_length=512,
-    truncation=True,
-    padding="max_length"
-)
-```
-
-## 🧪 Testing
-
-Run the test suite:
+Or install manually:
 
 ```bash
-python -m pytest tests/
+pip install torch transformers datasets peft huggingface_hub pyfiglet accelerate
 ```
 
-## 📝 License
+## Usage
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Quick Start
 
-## 🤝 Contributing
+1. Run the script:
+```bash
+python3 LLMRipper.py
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+2. Follow the interactive prompts:
+   - Choose model privacy (public/private)
+   - Select fine-tuning strategy (LoRA/Full)
+   - Specify dataset location and format
+   - Configure training parameters
+   - Start training!
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### Dataset Requirements
 
-## 📫 Contact
+Your dataset **MUST** contain these exact columns:
+- `System`: System prompts/instructions
+- `User`: User messages/questions
+- `Assistant`: Assistant responses
 
-For questions and support, please open an issue in the GitHub repository.
+### Supported Dataset Formats
 
-## 🙏 Acknowledgments
+- **CSV**: Comma-separated values
+- **JSON**: Standard JSON array
+- **JSONL**: JSON Lines (one JSON object per line)
+- **Parquet**: Apache Parquet format
 
-- Hugging Face for their amazing transformers library
-- The open-source community for their continuous support
+### Example Dataset (JSON)
+
+```json
+[
+  {
+    "System": "You are a helpful assistant.",
+    "User": "What is the capital of France?",
+    "Assistant": "The capital of France is Paris."
+  },
+  {
+    "System": "You are a helpful assistant.",
+    "User": "How do I cook pasta?",
+    "Assistant": "To cook pasta: 1) Boil water, 2) Add pasta, 3) Cook and drain."
+  }
+]
+```
+
+## Configuration Options
+
+### Fine-Tuning Strategies
+
+- **LoRA (Recommended)**: Parameter-efficient, faster training, less memory usage
+- **Full**: Complete model fine-tuning, more resource intensive
+
+### Training Parameters
+
+- **Sequence Length**: 128-8192 tokens (1024-2048 recommended)
+- **Batch Size**: 1, 2, 4, or 8 (start with 1-2 for large models)
+- **Gradient Accumulation**: 1, 2, 4, or 8 steps
+- **Epochs**: Number of training epochs (1-10 recommended)
+- **Quantization**: 4-bit or 8-bit for memory efficiency
+
+### Precision Options
+
+- **FP16**: Half-precision (faster, less memory)
+- **BF16**: Brain Float 16 (better stability)
+- **FP32**: Full precision (highest accuracy, more memory)
+
+## Security Features
+
+🔒 **Secure Token Input**: When entering HuggingFace tokens, your input is hidden from the terminal for security. You won't see the characters as you type - this is normal and intended behavior.
+
+## Tips for Success
+
+1. **Start Small**: Begin with a small dataset and short training to test
+2. **Monitor Memory**: Use quantization if you encounter OOM errors
+3. **Validation**: Always check your dataset format before training
+4. **LoRA First**: Try LoRA before full fine-tuning for most use cases
+5. **Save Frequently**: The tool auto-saves, but keep backups
+6. **Token Security**: Your HF tokens are hidden during input for security
+
+## Troubleshooting
+
+### Common Issues
+
+**"No module named 'torch'"**
+```bash
+pip install torch transformers datasets peft huggingface_hub
+```
+
+**"Dataset validation error"**
+- Ensure your dataset has exactly these columns: System, User, Assistant
+- Check column names are spelled correctly (case-sensitive)
+
+**"CUDA out of memory"**
+- Enable quantization (4-bit or 8-bit)
+- Reduce batch size to 1
+- Reduce sequence length
+- Use LoRA instead of full fine-tuning
+
+**"File not found"**
+- Check the dataset file path
+- Ensure the file format matches your selection
+
+## Output Files
+
+After training, you'll find:
+- `./finetuned_model/`: Your fine-tuned model
+- `./merged_final_model/`: Merged model (LoRA only, if chosen)
+
+## Advanced Usage
+
+### Using Private Models/Datasets
+
+The tool supports private HuggingFace repositories. You'll need:
+1. A HuggingFace account
+2. An access token with appropriate permissions
+3. Access to the private repository
+
+### Pushing to HuggingFace Hub
+
+After training, you can optionally push your model to HF Hub for sharing.
+
+## Support
+
+For issues or questions:
+1. Check this README
+2. Verify your dataset format
+3. Try with a smaller dataset first
+4. Check system requirements
+
+## License
+
+Created by Alican Kiraz - v2.0
 
 ---
 
-<div align="center">
-  <p>Made with ❤️ by Alican Kiraz</p>
-</div>
+Happy fine-tuning! 🚀 
