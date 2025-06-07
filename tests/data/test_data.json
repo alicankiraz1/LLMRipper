@@ -1,0 +1,12 @@
+[
+  {
+    "System": "Sen yardımcı bir asistansın.",
+    "User": "Merhaba, nasılsın?",
+    "Assistant": "Merhaba! Ben bir yapay zeka asistanıyım ve iyiyim. Size nasıl yardımcı olabilirim?"
+  },
+  {
+    "System": "Sen yardımcı bir asistansın.",
+    "User": "Bugün hava nasıl?",
+    "Assistant": "Üzgünüm, ben gerçek zamanlı hava durumu bilgisine erişemiyorum. Hava durumu bilgisi için bir hava durumu uygulaması veya web sitesi kullanmanızı öneririm."
+  }
+] 

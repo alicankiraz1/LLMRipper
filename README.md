@@ -1,55 +1,97 @@
 # LLMRipper
-![LLMRipper](/images/LLMRipper_Icon.png)
 
-**LLMRipper** allows you to fine-tune any Hugging Face LLM model without writing any code, using the Transformers architecture.
+LLMRipper, Hugging Face LLM modellerini kolayca ince ayar yapmanızı sağlayan güçlü bir araçtır. Transformers mimarisini kullanarak, herhangi bir Hugging Face modelini kod yazmadan ince ayar yapabilirsiniz.
 
-With LLMRipper.py v1.0, you can perform fine-tuning on either a private or public LLM model and dataset using a single GPU. In the next version, support for multi-GPU training will also be added to the tool’s features. Your training dataset must be in the System-User-Assistant structure.
+## Özellikler
 
-## Features
+- 🤖 Herhangi bir Hugging Face modelini destekler
+- 🚀 LoRA ile verimli ince ayar
+- 💾 4-bit ve 8-bit kuantizasyon desteği
+- 🔄 Otomatik veri seti bölme ve ön işleme
+- 📊 Detaylı eğitim metrikleri
+- 🎯 Erken durdurma ve model kaydetme
+- 🔒 Özel ve herkese açık modeller için destek
 
-- You can train **public** or **private** Hugging Face models.  
-- You can provide a **CSV** or **JSON** dataset either locally or from Hugging Face.  
-- You can set the **maximum batch size**, **gradient accumulation steps**, and **epoch** parameters you want for training.  
-- You can **quantize** the model and train it using **4-bit** or **8-bit** QLoRA.  
-- You can also train in **FP16**, **BF16**, or **FP32** precision without quantization.  
-- By using **DDP**, you can define multiple GPUs for training (Note: This feature will be available in **v1.1**).  
-- After training, you can **merge** the LoRA training outputs into the model and **push** it to Hugging Face.
+## Kurulum
 
+```bash
+# Gerekli paketleri yükleyin
+pip install -r requirements.txt
+```
 
-## Demo
+## Kullanım
 
-![LLMRipper Demo](/images/demo.png)
+```python
+from LLMRipper import LLMRipper
 
+# LLMRipper örneği oluştur
+ripper = LLMRipper({
+    "quantize": True,
+    "quantization_bits": 4,
+    "max_length": 1024,
+    "num_epochs": 3,
+    "batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 2e-5,
+    "precision": "fp16"
+})
 
-## Installation
+# Model ve tokenizer'ı yükle
+ripper.load_model("model_name", hf_token)
+ripper.load_tokenizer("model_name", hf_token)
 
-1. **Clone the repository:**
+# Veri setini yükle ve işle
+ripper.load_dataset({
+    "type": "huggingface",
+    "name": "dataset_name",
+    "private": False
+})
+ripper.preprocess_data()
 
-   ```bash
-   git clone https://github.com/alicankiraz1/LLMRipper.git
-   cd LLMRipper
+# Eğitimi başlat
+ripper.train()
 
-2. **Install Python Libraries:**
+# Modeli birleştir ve kaydet
+ripper.merge_and_save()
+```
 
-   ```bash
-   pip install -r requirements.txt
+## Konfigürasyon Seçenekleri
 
+| Parametre | Açıklama | Varsayılan |
+|-----------|-----------|------------|
+| quantize | Kuantizasyon kullanılsın mı? | False |
+| quantization_bits | Kuantizasyon biti (4 veya 8) | 4 |
+| max_length | Maksimum dizi uzunluğu | 1024 |
+| num_epochs | Eğitim epoch sayısı | 3 |
+| batch_size | Batch boyutu | 4 |
+| gradient_accumulation_steps | Gradient biriktirme adımları | 4 |
+| learning_rate | Öğrenme oranı | 2e-5 |
+| precision | Hassasiyet (fp16/bf16/fp32) | "fp16" |
 
-3. **Run the Code:**
+## Test
 
-   ```bash
-   python LLMRipper.py
+```bash
+# Tüm testleri çalıştır
+python -m unittest discover tests
 
-## Extras
+# Belirli bir test dosyasını çalıştır
+python -m unittest tests/test_llmripper.py
+```
 
-**For training with RTX 5000 Series:**
+## Katkıda Bulunma
 
-   ```bash
-   pip unistall torch torchvision torchaudio
+1. Bu depoyu fork edin
+2. Yeni bir özellik dalı oluşturun (`git checkout -b feature/amazing-feature`)
+3. Değişikliklerinizi commit edin (`git commit -m 'Add some amazing feature'`)
+4. Dalınıza push edin (`git push origin feature/amazing-feature`)
+5. Bir Pull Request açın
 
-   pip install --upgrade pip setuptools wheel
+## Lisans
 
-   pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu128
+Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
-   apt-get update && apt-get install -y build-essential cmake
+## İletişim
 
+Alican Kiraz - [@AlicanKiraz](https://twitter.com/AlicanKiraz)
+
+Proje Linki: [https://github.com/AlicanKiraz/LLMRipper](https://github.com/AlicanKiraz/LLMRipper)
