@@ -31,7 +31,7 @@ LLMRipper is a powerful Python tool designed to simplify the process of fine-tun
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/LLMRipper.git
+git clone https://github.com/alicankiraz1/LLMRipper.git
 cd LLMRipper
 ```
 
@@ -127,5 +127,5 @@ For questions and support, please open an issue in the GitHub repository.
 ---
 
 <div align="center">
-  <p>Made with ❤️ by the LLMRipper Team</p>
+  <p>Made with ❤️ by Alican Kiraz</p>
 </div>
