@@ -1,7 +1,7 @@
 # LLMRipper v2 - Interactive LLM Fine-Tuner
 
 <div align="center">
-  <img src="LLMRipper_Icon.png" alt="LLMRipper Logo" width="600"/>
+  <img src="https://raw.githubusercontent.com/alicankiraz1/LLMRipper/refs/heads/main/LLMRipper_v2.0.png" alt="LLMRipper Logo" width="600"/>
   <br>
   <p><em>Fine-tune and merge LLMs with ease</em></p>
 </div>
