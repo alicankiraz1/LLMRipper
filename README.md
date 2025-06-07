@@ -1,97 +1,131 @@
 # LLMRipper
 
-LLMRipper, Hugging Face LLM modellerini kolayca ince ayar yapmanızı sağlayan güçlü bir araçtır. Transformers mimarisini kullanarak, herhangi bir Hugging Face modelini kod yazmadan ince ayar yapabilirsiniz.
+<div align="center">
+  <img src="LLMRipper_Icon.png" alt="LLMRipper Logo" width="200"/>
+  <br>
+  <p><em>Fine-tune and merge LLMs with ease</em></p>
+</div>
 
-## Özellikler
+## 🚀 Overview
 
-- 🤖 Herhangi bir Hugging Face modelini destekler
-- 🚀 LoRA ile verimli ince ayar
-- 💾 4-bit ve 8-bit kuantizasyon desteği
-- 🔄 Otomatik veri seti bölme ve ön işleme
-- 📊 Detaylı eğitim metrikleri
-- 🎯 Erken durdurma ve model kaydetme
-- 🔒 Özel ve herkese açık modeller için destek
+LLMRipper is a powerful Python tool designed to simplify the process of fine-tuning and merging Large Language Models (LLMs). It provides a streamlined interface for loading models, processing datasets, and creating merged models with enhanced capabilities.
 
-## Kurulum
+## ✨ Features
 
+- **Easy Model Loading**: Load models from Hugging Face Hub with a single line of code
+- **Dataset Processing**: Efficient handling of training datasets
+- **Model Merging**: Seamless merging of multiple models
+- **Customizable Training**: Flexible training parameters
+- **Progress Tracking**: Real-time progress monitoring
+- **Error Handling**: Robust error management and logging
+
+## 📋 Requirements
+
+- Python 3.8+
+- PyTorch
+- Transformers
+- Datasets
+- Other dependencies listed in `requirements.txt`
+
+## 🛠️ Installation
+
+1. Clone the repository:
 ```bash
-# Gerekli paketleri yükleyin
+git clone https://github.com/yourusername/LLMRipper.git
+cd LLMRipper
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv env
+source env/bin/activate  # On Windows: env\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
 pip install -r requirements.txt
 ```
 
-## Kullanım
+## 💻 Usage
+
+### Basic Usage
 
 ```python
-from LLMRipper import LLMRipper
+from llmripper import LLMRipper
 
-# LLMRipper örneği oluştur
-ripper = LLMRipper({
-    "quantize": True,
-    "quantization_bits": 4,
-    "max_length": 1024,
-    "num_epochs": 3,
-    "batch_size": 4,
-    "gradient_accumulation_steps": 4,
-    "learning_rate": 2e-5,
-    "precision": "fp16"
-})
+# Initialize LLMRipper
+ripper = LLMRipper(
+    model_name="gpt2",
+    dataset_name="wikitext",
+    output_dir="./output"
+)
 
-# Model ve tokenizer'ı yükle
-ripper.load_model("model_name", hf_token)
-ripper.load_tokenizer("model_name", hf_token)
-
-# Veri setini yükle ve işle
-ripper.load_dataset({
-    "type": "huggingface",
-    "name": "dataset_name",
-    "private": False
-})
+# Load and process data
+ripper.load_dataset()
 ripper.preprocess_data()
 
-# Eğitimi başlat
-ripper.train()
+# Load model and tokenizer
+ripper.load_model()
+ripper.load_tokenizer()
 
-# Modeli birleştir ve kaydet
+# Merge and save models
 ripper.merge_and_save()
 ```
 
-## Konfigürasyon Seçenekleri
+### Advanced Usage
 
-| Parametre | Açıklama | Varsayılan |
-|-----------|-----------|------------|
-| quantize | Kuantizasyon kullanılsın mı? | False |
-| quantization_bits | Kuantizasyon biti (4 veya 8) | 4 |
-| max_length | Maksimum dizi uzunluğu | 1024 |
-| num_epochs | Eğitim epoch sayısı | 3 |
-| batch_size | Batch boyutu | 4 |
-| gradient_accumulation_steps | Gradient biriktirme adımları | 4 |
-| learning_rate | Öğrenme oranı | 2e-5 |
-| precision | Hassasiyet (fp16/bf16/fp32) | "fp16" |
+```python
+# Custom training configuration
+ripper = LLMRipper(
+    model_name="gpt2",
+    dataset_name="wikitext",
+    output_dir="./output",
+    batch_size=8,
+    learning_rate=2e-5,
+    num_epochs=3
+)
 
-## Test
-
-```bash
-# Tüm testleri çalıştır
-python -m unittest discover tests
-
-# Belirli bir test dosyasını çalıştır
-python -m unittest tests/test_llmripper.py
+# Custom preprocessing
+ripper.preprocess_data(
+    max_length=512,
+    truncation=True,
+    padding="max_length"
+)
 ```
 
-## Katkıda Bulunma
+## 🧪 Testing
 
-1. Bu depoyu fork edin
-2. Yeni bir özellik dalı oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add some amazing feature'`)
-4. Dalınıza push edin (`git push origin feature/amazing-feature`)
-5. Bir Pull Request açın
+Run the test suite:
 
-## Lisans
+```bash
+python -m pytest tests/
+```
 
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+## 📝 License
 
-## İletişim
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Alican Kiraz - [@AlicanKiraz](https://twitter.com/AlicanKiraz)
+## 🤝 Contributing
 
-Proje Linki: [https://github.com/AlicanKiraz/LLMRipper](https://github.com/AlicanKiraz/LLMRipper)
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📫 Contact
+
+For questions and support, please open an issue in the GitHub repository.
+
+## 🙏 Acknowledgments
+
+- Hugging Face for their amazing transformers library
+- The open-source community for their continuous support
+
+---
+
+<div align="center">
+  <p>Made with ❤️ by the LLMRipper Team</p>
+</div>
