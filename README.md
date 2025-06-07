@@ -18,6 +18,7 @@
 ✅ **HuggingFace Integration**: Seamless integration with HF Hub for models and datasets  
 ✅ **Error Handling**: Comprehensive error handling and validation  
 ✅ **Secure Token Input**: Hidden token input for better security  
+✅ **Auto Target Modules**: Automatic detection of LoRA target modules for different model architectures  
 
 ## Installation
 
@@ -107,6 +108,18 @@ Your dataset **MUST** contain these exact columns:
 - **BF16**: Brain Float 16 (better stability)
 - **FP32**: Full precision (highest accuracy, more memory)
 
+### Supported Model Architectures
+
+The tool automatically detects and configures LoRA target modules for:
+
+- **Llama/Alpaca/Vicuna**: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+- **Gemma**: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+- **Mistral**: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj
+- **GPT-NeoX**: query_key_value, dense, dense_h_to_4h, dense_4h_to_h
+- **Qwen**: c_attn, c_proj, w1, w2
+- **Phi**: q_proj, k_proj, v_proj, dense, fc1, fc2
+- **Unknown architectures**: Auto-detection fallback
+
 ## Security Features
 
 🔒 **Secure Token Input**: When entering HuggingFace tokens, your input is hidden from the terminal for security. You won't see the characters as you type - this is normal and intended behavior.
@@ -142,6 +155,11 @@ pip install torch transformers datasets peft huggingface_hub
 **"File not found"**
 - Check the dataset file path
 - Ensure the file format matches your selection
+
+**"Please specify target_modules in peft_config"**
+- This error is now automatically handled by the tool
+- The tool detects your model architecture and sets appropriate target modules
+- If auto-detection fails, it falls back to safe default modules
 
 ## Output Files
 
