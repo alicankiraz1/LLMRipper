@@ -1,7 +1,7 @@
 # LLMRipper
 
 <div align="center">
-  <img src="LLMRipper_Icon.png" alt="LLMRipper Logo" width="200"/>
+  <img src="LLMRipper_Icon.png" alt="LLMRipper Logo" width="600"/>
   <br>
   <p><em>Fine-tune and merge LLMs with ease</em></p>
 </div>
