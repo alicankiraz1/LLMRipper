@@ -1,10 +1,6 @@
 # LLMRipper v2 - Interactive LLM Fine-Tuner
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/alicankiraz1/LLMRipper/refs/heads/main/LLMRipper_v2.0.png" alt="LLMRipper Logo" width="600"/>
-  <br>
-  <p><em>Fine-tune and merge LLMs with ease</em></p>
-</div>
+<img src="https://raw.githubusercontent.com/alicankiraz1/LLMRipper/refs/heads/main/LLMRipper_v2.0.png" width="500" height="500">
 
 **LLMRipper** is an interactive tool for fine-tuning Large Language Models (LLMs) with both LoRA (Parameter-Efficient Fine-Tuning) and Full Fine-Tuning support.
 
